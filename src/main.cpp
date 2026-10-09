@@ -1,7 +1,9 @@
 #include <CLI/CLI.hpp>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <random>
+#include <stdexcept>
 
 #include "orchestrator.hpp"
 #include "reducer.hpp"
@@ -28,7 +30,7 @@ int main(int argc, char** argv) {
 
 
         app.add_option("-l,--lib",     lib_cfg,      "Cell library YAML");
-        app.add_option("-s,--seed",    seed_str,     "Random seed");
+        app.add_option("-s,--seed",    seed_str,     "Random seed (decimal or 0x-prefixed hexadecimal)");
         app.add_flag  ("-v,--verbose", verbose,      "Print chosen options");
         app.add_flag  ("--version",    show_ver,     "Show version");
         app.add_flag  ("-j,--json",    json_stats,   "Write JSON stats");
@@ -61,7 +63,17 @@ int main(int argc, char** argv) {
                       << "seed     : " << seed_str     << '\n';
         }
 
-        unsigned seed = std::stoul(seed_str);
+        const auto first_digit = seed_str.find_first_not_of(" \t");
+        const bool hex = first_digit != std::string::npos &&
+            seed_str.compare(first_digit, 2, "0x") == 0;
+        const bool upper_hex = first_digit != std::string::npos &&
+            seed_str.compare(first_digit, 2, "0X") == 0;
+        std::size_t parsed = 0;
+        const auto seed_value = std::stoul(seed_str, &parsed, hex || upper_hex ? 16 : 10);
+        if (parsed != seed_str.size() || seed_value > std::numeric_limits<unsigned>::max()) {
+            throw std::invalid_argument("Seed must be a 32-bit decimal or 0x-prefixed hexadecimal number");
+        }
+        unsigned seed = static_cast<unsigned>(seed_value);
 
         if (*generate_mode) {
             fuznet::Orchestrator orch(lib_cfg, settings_cfg, seed, verbose, animate, json_stats);

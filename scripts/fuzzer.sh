@@ -152,8 +152,14 @@ EOF
 
     echo "$result_line" >> "$results_csv"
 
-
-    rm -rf "$OUT_DIR" || true
+    # 修改删除逻辑，不直接删除中间缓存内容
+    # rm -rf "$OUT_DIR" || true
+    if [[ ${KEEP_OUT_DIR:-0} == 1 ]]; then
+        mkdir -p "$PERMANENT_LOGS/cases"
+        mv -- "$OUT_DIR" "$PERMANENT_LOGS/cases/"
+    else
+        rm -rf "$OUT_DIR" || true
+    fi
 }
 
 time_stage() {
@@ -185,7 +191,10 @@ capture_failed_seed() {
 
 sigint_handler() {
     echo "Caught SIGINT or SIGTERM, exiting..."
-    rm -rf "$OUT_DIR" 2>/dev/null || true
+    # 设置 KEEP_OUT_DIR=1 时，每轮的网表、各阶段日志及其他中间文件会进入 logs/trial-10m/cases/
+    if [[ ${KEEP_OUT_DIR:-0} != 1 ]]; then
+        rm -rf "$OUT_DIR" 2>/dev/null || true
+    fi
     exit 1
 }
 
